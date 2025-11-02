@@ -31,27 +31,18 @@ echo "🔍 Verificando dependencias..."
 if ! python3 -c "import gi" 2>/dev/null; then
     echo -e "${RED}❌ Error: python3-gi no está instalado${NC}"
     echo "Instala las dependencias con:"
-    echo "  sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0"
+    echo "  sudo apt install python3-gi gir1.2-gtk-3.0"
     exit 1
 fi
 
 if ! python3 -c "from gi.repository import Gtk" 2>/dev/null; then
     echo -e "${RED}❌ Error: GTK3 no está disponible${NC}"
     echo "Instala las dependencias con:"
-    echo "  sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0"
+    echo "  sudo apt install python3-gi gir1.2-gtk-3.0"
     exit 1
 fi
 
-# Verificar dependencias adicionales
-echo "🔍 Verificando dependencias adicionales..."
-if ! python3 -c "import cairo" 2>/dev/null; then
-    echo -e "${YELLOW}⚠️  python3-cairo no está instalado${NC}"
-    echo "Instala con: sudo apt install python3-cairo"
-fi
-
-if ! python3 -c "import json" 2>/dev/null; then
-    echo -e "${YELLOW}⚠️  python3-json no está disponible${NC}"
-fi
+# json es parte de la biblioteca estándar de Python 3, siempre disponible
 
 # Verificar herramientas del sistema
 echo "🔍 Verificando herramientas del sistema..."

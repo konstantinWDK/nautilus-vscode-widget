@@ -132,18 +132,26 @@ nautilus-vscode-widget
 El sistema de paquetes Debian/Ubuntu maneja automáticamente las dependencias especificadas en el archivo `control` del paquete.
 
 #### Dependencias que se instalarán automáticamente:
-- **python3** - Intérprete de Python 3
+
+**Esenciales (requeridas):**
+- **python3** (>= 3.8) - Intérprete de Python 3
 - **python3-gi** - Bindings de Python para GTK
-- **python3-gi-cairo** - Soporte Cairo para GTK
 - **gir1.2-gtk-3.0** - Introspection data para GTK 3
-- **python3-xlib** - Biblioteca para operaciones X11 nativas (NUEVO en v3.3.0)
+
+**Recomendadas (opcionales):**
 - **xdotool** - Herramienta para manipular ventanas X11
 - **wmctrl** - Controlador de ventanas X11
+
+**Sugeridas (opcionales):**
+- **python3-xlib** - Biblioteca para operaciones X11 nativas
+
+**❌ Eliminadas (ya no necesarias):**
+- ~~python3-gi-cairo~~ - No se usa, la transparencia se logra con CSS/RGBA
 
 #### Comandos útiles para gestión:
 ```bash
 # Verificar dependencias instaladas
-dpkg -l | grep -E "(python3-gi|python3-xlib|xdotool|wmctrl)"
+dpkg -l | grep -E "(python3-gi|gir1.2-gtk|xdotool|wmctrl)"
 
 # Desinstalar completamente
 sudo apt remove nautilus-vscode-widget
@@ -256,18 +264,27 @@ Archivo de autostart (si está habilitado):
 
 ## 🔧 Requisitos
 
-- Python 3
-- GTK+ 3
-- cairo (para transparencia)
-- python-xlib (para detección nativa de ventanas)
-- xdotool (para detección de ventanas - fallback)
-- xprop (para propiedades de ventana - fallback)
-- gdbus (para comunicación con Nautilus)
+**Dependencias esenciales:**
+- Python 3 (>= 3.8)
+- GTK+ 3 (`python3-gi`, `gir1.2-gtk-3.0`)
 - VSCode o compatible (code, code-insiders, codium, vscodium)
+
+**Dependencias opcionales (para detección avanzada):**
+- `xdotool` - Detección de ventanas en X11 (recomendado)
+- `wmctrl` - Control de ventanas (recomendado)
+- `python3-xlib` - Detección nativa de ventanas (opcional)
+
+**Dependencias eliminadas (ya no necesarias):**
+- ❌ `python3-gi-cairo` - No se usa, la transparencia se maneja con CSS/RGBA
+- ❌ `cairo` - No se usa directamente
 
 Instalar dependencias en Ubuntu/Debian:
 ```bash
-sudo apt install python3-gi gir1.2-gtk-3.0 python3-xlib xdotool x11-utils
+# Dependencias esenciales
+sudo apt install python3-gi gir1.2-gtk-3.0
+
+# Dependencias recomendadas (para mejor detección)
+sudo apt install xdotool wmctrl
 ```
 
 ## 🐛 Solución de Problemas

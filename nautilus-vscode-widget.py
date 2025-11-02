@@ -487,7 +487,7 @@ def get_desktop_bounds():
             max_y = max(max_y, geometry.y + geometry.height)
 
         return min_x, min_y, max_x, max_y
-    except Exception as e:
+    except Exception:
         # Fallback: usar valores por defecto si falla la detección
         return 0, 0, 1920, 1080
 
@@ -613,25 +613,24 @@ class FloatingButtonApp:
         self.window.set_geometry_hints(None, geometry,
                                        Gdk.WindowHints.MIN_SIZE | Gdk.WindowHints.MAX_SIZE)
 
-        # Position window in bottom right corner by default
-        screen = Gdk.Screen.get_default()
+        # Position window - mejorado para evitar bloqueos en Wayland
         if self.config.get('first_run', True):
-            # Primera vez: posicionar en esquina inferior derecha
-            # Usar métodos modernos para obtener dimensiones de pantalla
-            display = Gdk.Display.get_default()
-            monitor = display.get_primary_monitor() or display.get_monitor(0)
-            geometry = monitor.get_geometry()
-            screen_width = geometry.width
-            screen_height = geometry.height
-            # Posicionar en el centro de la pantalla para pruebas
-            self.config['position_x'] = screen_width // 2 - self.button_size // 2
-            self.config['position_y'] = screen_height // 2 - self.button_size // 2
-            # v3.3.6: Widget siempre visible por defecto (optimización)
+            # Primera ejecución: NO forzar posición
+            # Dejamos que el window manager decida la posición inicial
+            # Esto evita problemas en Wayland donde window.move() antes de realize() causa bloqueos
             self.config['always_visible'] = True
             self.config['first_run'] = False
+            # NO guardar position_x/position_y todavía - se guardará cuando el usuario mueva el widget
             self.save_config()
-
-        self.window.move(self.config['position_x'], self.config['position_y'])
+            self.logger.info("Primera ejecución - sin posición forzada, widget movible libremente")
+        elif 'position_x' in self.config and 'position_y' in self.config:
+            # Solo en ejecuciones posteriores con posición guardada
+            # Postponer el movimiento hasta después de realize() para evitar bloqueos
+            # Usamos un delay más largo para asegurar que la ventana esté completamente realizada
+            GLib.timeout_add(200, self._restore_saved_position)
+            self.logger.debug(f"Posición guardada encontrada: ({self.config['position_x']}, {self.config['position_y']})")
+        else:
+            self.logger.info("Sin posición guardada - usando posición del sistema")
 
         # Configurar visual RGBA para transparencia via CSS (sin cairo)
         screen = self.window.get_screen()
@@ -681,10 +680,8 @@ class FloatingButtonApp:
         # Posicionar botones secundarios después de que la ventana esté visible
         # Se hará en el primer fade_in()
 
-        # Forzar la posición guardada después de que la ventana se muestre
-        # Esto previene que el window manager reposicione la ventana
-        GLib.idle_add(self._restore_saved_position)
-        GLib.timeout_add(100, self._restore_saved_position)  # Backup después de 100ms
+        # Nota: _restore_saved_position ya se llama desde __init__ con GLib.timeout_add(200, ...)
+        # No es necesario llamarlo de nuevo aquí para evitar movimientos duplicados
 
     def set_window_opacity(self, opacity):
         """Set opacity for main window"""
@@ -773,8 +770,8 @@ class FloatingButtonApp:
     def load_config(self):
         """Load configuration from file with validation"""
         default_config = {
-            'position_x': 100,
-            'position_y': 100,
+            # NO incluir position_x/position_y por defecto
+            # Se guardarán automáticamente cuando el usuario mueva el widget
             'editor_command': 'code',
             'button_color': '#2C2C2C',
             'show_label': False,
@@ -1292,10 +1289,22 @@ class FloatingButtonApp:
         """Forzar la restauración de la posición guardada en la configuración.
         Esto previene que el window manager reposicione la ventana al mostrarla."""
         try:
-            # Verificar que no es la primera ejecución
-            if not self.config.get('first_run', True):
-                saved_x = self.config.get('position_x', 100)
-                saved_y = self.config.get('position_y', 100)
+            # Solo restaurar si hay posición guardada y no es primera ejecución
+            if not self.config.get('first_run', True) and 'position_x' in self.config and 'position_y' in self.config:
+                saved_x = self.config['position_x']
+                saved_y = self.config['position_y']
+
+                # Validar que las coordenadas estén dentro de los límites de pantalla
+                min_x, min_y, max_x, max_y = get_desktop_bounds()
+
+                # Ajustar si está fuera de límites
+                if saved_x < min_x or saved_x > max_x - self.button_size:
+                    saved_x = max(min_x, min(saved_x, max_x - self.button_size))
+                    self.logger.warning(f"Posición X ajustada a límites: {saved_x}")
+
+                if saved_y < min_y or saved_y > max_y - self.button_size:
+                    saved_y = max(min_y, min(saved_y, max_y - self.button_size))
+                    self.logger.warning(f"Posición Y ajustada a límites: {saved_y}")
 
                 # Obtener posición actual
                 current_x, current_y = self.window.get_position()
@@ -2001,7 +2010,7 @@ class FloatingButtonApp:
                 continue
             except (FileNotFoundError, PermissionError, OSError):
                 continue
-            except Exception as _e:
+            except Exception:
                 continue
         
         return False
