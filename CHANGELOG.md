@@ -5,6 +5,42 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.3.11] - 2025-11-02
+
+### 🎨 Tema Adaptativo y Transparencia Mejorada
+
+#### Corrección de Transparencia del Widget
+- **FIX**: Eliminado cuadro negro alrededor del botón circular principal
+- **CSS mejorado**: Ventana (`#floating-button`) y contenedor Fixed (`#main-container`) completamente transparentes
+- **Solo el botón tiene fondo**: El círculo del botón es lo único visible con color
+- **Mejor integración visual**: Widget se integra perfectamente sin fondos extraños
+
+#### Mejoras en la Interfaz de Configuración
+- **FIX**: Ventana de configuración ahora se adapta al tema del sistema (claro/oscuro)
+- **Detección automática de tema**: Lee `gtk-theme-name` y `gtk-application-prefer-dark-theme`
+- **CSS adaptativo**:
+  - Modo oscuro: Fondo gris oscuro (rgba(50,50,55)) con texto blanco
+  - Modo claro: Fondo gris claro (rgba(245,245,245)) con texto negro (#222222)
+- **Mejor legibilidad**: Las etiquetas ahora son visibles en ambos temas
+
+#### Optimización de Dependencias
+- **REMOVED**: Eliminada dependencia `python3-gi-cairo` (no se usa en el código)
+- **Archivo control actualizado**: Dependencias reducidas a lo esencial
+- **Menor huella**: Instalación más ligera sin cairo
+
+#### Cambios Técnicos
+- Método `apply_dialog_styles()` ahora detecta tema y genera CSS dinámicamente
+- Logging del tema detectado para diagnóstico
+- Colores optimizados para cada modo:
+  - Botones, entries, switches con contraste adecuado
+  - Bordes y sombras adaptados al contexto
+
+#### Impacto
+- ✅ Configuración legible en modo claro y oscuro
+- ✅ Menor tamaño de instalación (sin cairo)
+- ✅ Mejor integración con el tema del sistema
+- ✅ Sin regresiones en funcionalidad
+
 ## [3.3.10] - 2025-11-01
 
 ### 🔧 Corrección Crítica - Widget No Arrastrable en Primera Instalación

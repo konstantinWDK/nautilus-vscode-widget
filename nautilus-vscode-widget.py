@@ -6,7 +6,7 @@ y permite abrirla en VSCode
 """
 
 # Version
-VERSION = "3.3.10"
+VERSION = "3.3.11"
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -581,8 +581,17 @@ class FloatingButtonApp:
 
         self.window.move(self.config['position_x'], self.config['position_y'])
 
-        # NO usar transparencia - causa problemas de visibilidad
-        self.window.set_app_paintable(False)
+        # Configurar visual RGBA para transparencia via CSS (sin cairo)
+        screen = self.window.get_screen()
+        visual = screen.get_rgba_visual()
+        if visual and screen.is_composited():
+            self.window.set_visual(visual)
+            self.logger.debug("Visual RGBA configurado - transparencia habilitada")
+        else:
+            self.logger.warning("Visual RGBA no disponible - usando visual por defecto")
+
+        # Habilitar app_paintable para permitir transparencia via CSS
+        self.window.set_app_paintable(True)
 
         # Create button
         self.create_button()
@@ -828,6 +837,7 @@ class FloatingButtonApp:
         """Create the main button"""
         # Main container - Fixed box en lugar de Overlay
         fixed = Gtk.Fixed()
+        fixed.set_name("main-container")
         fixed.set_app_paintable(True)
         # Forzar tamaño exacto del contenedor - NO permitir expansión
         fixed.set_size_request(self.button_size, self.button_size)
@@ -1362,9 +1372,15 @@ class FloatingButtonApp:
             """
 
         css = f"""
-        /* Ventana del widget principal */
+        /* Ventana del widget principal - completamente transparente */
         #floating-button {{
-            background-color: rgba(0, 0, 0, 0);
+            background-color: transparent;
+            background: transparent;
+        }}
+
+        /* Fixed container - también transparente */
+        #main-container {{
+            background-color: transparent;
             background: transparent;
         }}
 
@@ -1375,7 +1391,7 @@ class FloatingButtonApp:
             border: 1px solid rgba(255, 255, 255, 0.15);
         }}
 
-        /* Botón principal - simple sin sombras */
+        /* Botón principal - solo el botón tiene fondo circular */
         #floating-button button {{
             border-radius: 20px;
             background: rgba({r}, {g}, {b}, 0.95);
@@ -2429,75 +2445,134 @@ class SettingsDialog:
         self.dialog.destroy()
 
     def apply_dialog_styles(self):
-        """Apply modern styles with blur to dialog"""
+        """Apply modern styles with adaptive light/dark theme"""
         css_provider = Gtk.CssProvider()
 
-        css = """
-        dialog {
-            background: rgba(50, 50, 55, 0.98);
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-        }
+        # Detectar si el tema del sistema es oscuro o claro
+        settings = Gtk.Settings.get_default()
+        theme_name = settings.get_property("gtk-theme-name").lower()
+        is_dark = any(dark in theme_name for dark in ['dark', 'noir', 'oscur', 'black'])
 
-        dialog headerbar {
-            background: rgba(60, 60, 65, 0.98);
-            border-radius: 12px 12px 0 0;
-            color: white;
-        }
+        # Si no se puede detectar por nombre, intentar por prefer-dark-theme
+        if not is_dark:
+            is_dark = settings.get_property("gtk-application-prefer-dark-theme")
 
-        dialog headerbar label {
-            color: white;
-        }
+        # CSS adaptativo según el tema
+        if is_dark:
+            # Tema oscuro
+            css = """
+            dialog {
+                background: rgba(50, 50, 55, 0.98);
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
 
-        dialog box {
-            background: transparent;
-        }
+            dialog headerbar {
+                background: rgba(60, 60, 65, 0.98);
+                border-radius: 12px 12px 0 0;
+                color: white;
+            }
 
-        dialog entry {
-            border-radius: 6px;
-            padding: 8px;
-            background: rgba(70, 70, 75, 0.9);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
+            dialog entry {
+                border-radius: 6px;
+                padding: 8px;
+                background: rgba(70, 70, 75, 0.9);
+                color: white;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
 
-        dialog entry:focus {
-            border: 1px solid rgba(100, 150, 255, 0.6);
-            box-shadow: 0 0 0 3px rgba(100, 150, 255, 0.2);
-            background: rgba(80, 80, 85, 0.95);
-        }
+            dialog entry:focus {
+                border: 1px solid rgba(100, 150, 255, 0.6);
+                box-shadow: 0 0 0 3px rgba(100, 150, 255, 0.2);
+                background: rgba(80, 80, 85, 0.95);
+            }
 
-        dialog button {
-            border-radius: 6px;
-            padding: 8px 16px;
-            background: rgba(70, 70, 75, 0.9);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
+            dialog button {
+                border-radius: 6px;
+                padding: 8px 16px;
+                background: rgba(70, 70, 75, 0.9);
+                color: white;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
 
-        dialog button:hover {
-            background: rgba(90, 90, 95, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
+            dialog button:hover {
+                background: rgba(90, 90, 95, 0.95);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+            }
 
-        dialog label {
-            color: #ffffff;
-        }
+            dialog label {
+                color: #ffffff;
+            }
 
-        dialog switch {
-            background: rgba(70, 70, 75, 0.9);
-        }
+            dialog switch {
+                background: rgba(70, 70, 75, 0.9);
+            }
 
-        dialog switch:checked {
-            background: rgba(100, 150, 255, 0.8);
-        }
-        """.encode('utf-8')
+            dialog switch:checked {
+                background: rgba(100, 150, 255, 0.8);
+            }
+            """
+        else:
+            # Tema claro
+            css = """
+            dialog {
+                background: rgba(245, 245, 245, 0.98);
+                border-radius: 12px;
+                border: 1px solid rgba(0, 0, 0, 0.1);
+            }
 
-        css_provider.load_from_data(css)
+            dialog headerbar {
+                background: rgba(235, 235, 235, 0.98);
+                border-radius: 12px 12px 0 0;
+                color: #333333;
+            }
+
+            dialog entry {
+                border-radius: 6px;
+                padding: 8px;
+                background: rgba(255, 255, 255, 0.95);
+                color: #222222;
+                border: 1px solid rgba(0, 0, 0, 0.2);
+            }
+
+            dialog entry:focus {
+                border: 1px solid rgba(66, 133, 244, 0.6);
+                box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.2);
+                background: rgba(255, 255, 255, 1.0);
+            }
+
+            dialog button {
+                border-radius: 6px;
+                padding: 8px 16px;
+                background: rgba(255, 255, 255, 0.95);
+                color: #333333;
+                border: 1px solid rgba(0, 0, 0, 0.2);
+            }
+
+            dialog button:hover {
+                background: rgba(240, 240, 240, 1.0);
+                border: 1px solid rgba(0, 0, 0, 0.3);
+            }
+
+            dialog label {
+                color: #222222;
+            }
+
+            dialog switch {
+                background: rgba(200, 200, 200, 0.9);
+            }
+
+            dialog switch:checked {
+                background: rgba(66, 133, 244, 0.8);
+            }
+            """
+
+        css_provider.load_from_data(css.encode('utf-8'))
 
         style_context = self.dialog.get_style_context()
         style_context.add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+        self.app.logger.debug(f"Tema detectado: {'oscuro' if is_dark else 'claro'} (gtk-theme-name: {theme_name})")
 
     def save_settings(self):
         """Save settings and apply changes"""
