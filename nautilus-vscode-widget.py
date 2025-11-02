@@ -24,9 +24,10 @@ import shutil
 import threading
 import platform
 from functools import lru_cache
-from datetime import datetime
+import warnings  # Movido aquí desde imports locales
 
 # Xlib eliminado - no es necesario para el funcionamiento del widget
+# datetime eliminado - no se usa, se usa time.time() en su lugar
 
 
 # OPTIMIZACIÓN: SubprocessCache reemplazada por functools.lru_cache
@@ -459,6 +460,68 @@ def get_autostart_file():
         return os.path.join(autostart_dir, 'nautilus-vscode-widget.desktop')
 
 
+# ============================================================================
+# FUNCIONES AUXILIARES PARA EVITAR DUPLICACIÓN DE CÓDIGO
+# ============================================================================
+
+def get_desktop_bounds():
+    """
+    Obtener límites totales del escritorio (todos los monitores).
+    Función auxiliar para evitar duplicación de código en manejo de drag/drop.
+
+    Returns:
+        tuple: (min_x, min_y, max_x, max_y) - límites del escritorio completo
+    """
+    try:
+        display = Gdk.Display.get_default()
+        n_monitors = display.get_n_monitors()
+
+        min_x, min_y, max_x, max_y = 0, 0, 0, 0
+
+        for i in range(n_monitors):
+            monitor = display.get_monitor(i)
+            geometry = monitor.get_geometry()
+            min_x = min(min_x, geometry.x)
+            min_y = min(min_y, geometry.y)
+            max_x = max(max_x, geometry.x + geometry.width)
+            max_y = max(max_y, geometry.y + geometry.height)
+
+        return min_x, min_y, max_x, max_y
+    except Exception as e:
+        # Fallback: usar valores por defecto si falla la detección
+        return 0, 0, 1920, 1080
+
+
+def calculate_favorites_container_size(num_favorite_buttons):
+    """
+    Calcular tamaño del contenedor de favoritos.
+    Función auxiliar para evitar duplicación de código.
+
+    Args:
+        num_favorite_buttons: Número de botones favoritos actuales
+
+    Returns:
+        tuple: (container_width, container_height) - tamaño del contenedor
+    """
+    btn_size = 24
+    spacing = 4
+    margin = 8
+
+    container_width = btn_size + margin * 2
+
+    if num_favorite_buttons == 0:
+        container_height = btn_size + margin * 2
+    else:
+        # +1 para incluir el botón "+" de añadir
+        container_height = (btn_size + spacing) * (num_favorite_buttons + 1) + margin * 2 - spacing
+
+    return container_width, container_height
+
+
+# ============================================================================
+# CLASE PRINCIPAL
+# ============================================================================
+
 class FloatingButtonApp:
     def __init__(self):
         # Configurar rutas según el modo (portable o instalado)
@@ -627,14 +690,14 @@ class FloatingButtonApp:
         """Set opacity for main window"""
         self.window_opacity = opacity
         # Suprimir warnings de deprecación temporalmente
-        import warnings
+        # warnings ya está importado globalmente
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             self.window.set_opacity(opacity)
 
     def set_widget_opacity(self, widget, opacity):
         """Set opacity for a widget"""
-        import warnings
+        # warnings ya está importado globalmente
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             widget.set_opacity(opacity)
@@ -1018,7 +1081,7 @@ class FloatingButtonApp:
         self.favorites_window.show_all()
 
         # Inicialmente oculto
-        import warnings
+        # warnings ya está importado globalmente
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             self.favorites_window.set_opacity(0.0)
@@ -1154,22 +1217,9 @@ class FloatingButtonApp:
         if not hasattr(self, 'favorites_window'):
             return
 
-        # Calcular tamaño del contenedor basado en número de botones
+        # Usar función auxiliar para calcular tamaño (evita duplicación)
         num_buttons = len(self.favorite_buttons)
-
-        # Tamaño del contenedor
-        btn_size = 24
-        spacing = 4
-        margin = 8
-
-        # Calcular tamaño del contenedor
-        container_width = btn_size + margin * 2
-        if num_buttons == 0:
-            # Solo el botón + : darle más margen para evitar superposición
-            container_height = btn_size + margin * 2
-        else:
-            # Favoritos + botón +
-            container_height = (btn_size + spacing) * (num_buttons + 1) + margin * 2 - spacing
+        container_width, container_height = calculate_favorites_container_size(num_buttons)
 
         self.favorites_window.set_default_size(container_width, container_height)
 
@@ -1264,7 +1314,7 @@ class FloatingButtonApp:
         """Manejar clic en el botón de añadir carpeta"""
         dialog = Gtk.FileChooserDialog(
             title="Seleccionar carpeta favorita",
-            parent=None,
+            parent=self.window,  # FIX: Añadido parent para evitar error en Wayland
             action=Gtk.FileChooserAction.SELECT_FOLDER
         )
         dialog.add_buttons(
@@ -1581,24 +1631,8 @@ class FloatingButtonApp:
                 x = int(event.x_root - self.drag_offset_x)
                 y = int(event.y_root - self.drag_offset_y)
 
-                # Calcular área total de todos los monitores (soporte multi-pantalla)
-                display = Gdk.Display.get_default()
-                n_monitors = display.get_n_monitors()
-
-                # Calcular límites totales del escritorio (todos los monitores)
-                min_x = 0
-                min_y = 0
-                max_x = 0
-                max_y = 0
-
-                for i in range(n_monitors):
-                    monitor = display.get_monitor(i)
-                    geometry = monitor.get_geometry()
-                    # Expandir límites
-                    min_x = min(min_x, geometry.x)
-                    min_y = min(min_y, geometry.y)
-                    max_x = max(max_x, geometry.x + geometry.width)
-                    max_y = max(max_y, geometry.y + geometry.height)
+                # Usar función auxiliar para obtener límites (evita duplicación)
+                min_x, min_y, max_x, max_y = get_desktop_bounds()
 
                 # Limitar coordenadas dentro del área total del escritorio
                 x = max(min_x, min(x, max_x - self.button_size))
@@ -1622,17 +1656,9 @@ class FloatingButtonApp:
         if not hasattr(self, 'favorites_window') or not self.favorites_window.get_visible():
             return
 
-        # Calcular nueva posición de favoritos basada en la posición del botón principal
+        # Usar función auxiliar para calcular tamaño (evita duplicación)
         num_buttons = len(self.favorite_buttons)
-        btn_size = 24
-        spacing = 4
-        margin = 8
-
-        container_width = btn_size + margin * 2
-        if num_buttons == 0:
-            container_height = btn_size + margin * 2
-        else:
-            container_height = (btn_size + spacing) * (num_buttons + 1) + margin * 2 - spacing
+        container_width, container_height = calculate_favorites_container_size(num_buttons)
 
         main_center_x = main_x + self.button_size // 2
         container_x = main_center_x - container_width // 2
@@ -1698,23 +1724,8 @@ class FloatingButtonApp:
                 x = int(event.x_root - self.drag_offset_x)
                 y = int(event.y_root - self.drag_offset_y)
 
-                # Calcular área total de todos los monitores (soporte multi-pantalla)
-                display = Gdk.Display.get_default()
-                n_monitors = display.get_n_monitors()
-
-                # Calcular límites totales del escritorio
-                min_x = 0
-                min_y = 0
-                max_x = 0
-                max_y = 0
-
-                for i in range(n_monitors):
-                    monitor = display.get_monitor(i)
-                    geometry = monitor.get_geometry()
-                    min_x = min(min_x, geometry.x)
-                    min_y = min(min_y, geometry.y)
-                    max_x = max(max_x, geometry.x + geometry.width)
-                    max_y = max(max_y, geometry.y + geometry.height)
+                # Usar función auxiliar para obtener límites (evita duplicación)
+                min_x, min_y, max_x, max_y = get_desktop_bounds()
 
                 # Limitar coordenadas dentro del área total
                 x = max(min_x, min(x, max_x - self.button_size))
@@ -2075,7 +2086,7 @@ class FloatingButtonApp:
                 # Format: (<'file:///path/to/directory'>,)
                 if 'file://' in output:
                     from urllib.parse import unquote
-                    import re
+                    # re ya está importado globalmente
                     match = re.search(r"'(file://[^']+)'", output)
                     if match:
                         uri = match.group(1)
@@ -2150,9 +2161,9 @@ class FloatingButtonApp:
             
             if prop_result.returncode == 0:
                 output = prop_result.stdout
-                
+
                 # Look for file paths in the properties
-                import re
+                # re ya está importado globalmente
                 paths = re.findall(r'["\']([^"\']*file://[^"\']*)["\']', output)
                 for path in paths:
                     if 'file://' in path:
@@ -2224,9 +2235,9 @@ class FloatingButtonApp:
         if title.startswith('/'):
             if os.path.exists(title):
                 return title
-        
+
         # Try to find path patterns in the original title
-        import re
+        # re ya está importado globalmente
         path_pattern = r'(/[^\s]+(?:/[^\s]*)*?)'
         matches = re.findall(path_pattern, original_title)
         for match in matches:
@@ -2394,7 +2405,7 @@ class FloatingButtonApp:
     def show_error_dialog(self, title, message):
         """Show error dialog"""
         dialog = Gtk.MessageDialog(
-            transient_for=None,
+            transient_for=self.window,  # FIX: Añadido parent para evitar error en Wayland
             flags=0,
             message_type=Gtk.MessageType.ERROR,
             buttons=Gtk.ButtonsType.OK,
@@ -2411,7 +2422,7 @@ class SettingsDialog:
 
         self.dialog = Gtk.Dialog(
             title="Configuración - VSCode Widget",
-            parent=None,
+            parent=parent_app.window,  # FIX: Añadido parent para evitar error en Wayland
             flags=0
         )
         self.dialog.set_default_size(400, 300)
@@ -2878,7 +2889,7 @@ StartupNotify=false
     def show_restart_dialog(self):
         """Show restart confirmation"""
         dialog = Gtk.MessageDialog(
-            transient_for=None,
+            transient_for=self.dialog,  # FIX: Añadido parent para evitar error en Wayland
             flags=0,
             message_type=Gtk.MessageType.INFO,
             buttons=Gtk.ButtonsType.OK,
