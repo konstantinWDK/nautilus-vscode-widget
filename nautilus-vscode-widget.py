@@ -6,7 +6,7 @@ y permite abrirla en VSCode
 """
 
 # Version
-VERSION = "3.3.11"
+VERSION = "3.3.12"
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -26,13 +26,7 @@ import platform
 from functools import lru_cache
 from datetime import datetime
 
-# Importaciones opcionales según el entorno
-try:
-    from Xlib import display, X
-    from Xlib.protocol import rq
-    XLIB_AVAILABLE = True
-except ImportError:
-    XLIB_AVAILABLE = False
+# Xlib eliminado - no es necesario para el funcionamiento del widget
 
 
 # OPTIMIZACIÓN: SubprocessCache reemplazada por functools.lru_cache
@@ -152,11 +146,7 @@ def log_system_diagnostics(logger):
     # 4. Dependencias opcionales
     logger.info("\nDEPENDENCIAS OPCIONALES:")
 
-    # Xlib
-    if XLIB_AVAILABLE:
-        logger.info("  ✓ Xlib: Disponible")
-    else:
-        logger.warning("  ✗ Xlib: No disponible (opcional, usado para X11)")
+    # Xlib eliminado - no es necesario
 
     # Herramientas del sistema
     tools = {
@@ -236,7 +226,6 @@ def detect_environment():
         'has_wmctrl': shutil.which('wmctrl') is not None,
         'has_xprop': shutil.which('xprop') is not None,
         'has_gdbus': shutil.which('gdbus') is not None,
-        'xlib_available': XLIB_AVAILABLE,
     }
 
     # Detectar Wayland
@@ -482,7 +471,7 @@ class FloatingButtonApp:
         self.env = detect_environment()
         self.logger.info(f"Entorno detectado: {self.env['display_server']} - Desktop: {self.env['desktop']}")
         self.logger.info(f"Herramientas disponibles - xdotool: {self.env['has_xdotool']}, "
-                        f"xlib: {self.env['xlib_available']}, gdbus: {self.env['has_gdbus']}")
+                        f"gdbus: {self.env['has_gdbus']}, wmctrl: {self.env['has_wmctrl']}")
 
         # Initialize variables FIRST
         self.current_directory = None
@@ -1543,12 +1532,9 @@ class FloatingButtonApp:
             self.drag_offset_x = event.x_root - x
             self.drag_offset_y = event.y_root - y
             
-            # Forzar captura de eventos para máquinas virtuales
+            # Capturar eventos de arrastre (método moderno sin deprecated functions)
             widget.grab_add()
-            Gdk.pointer_grab(widget.get_window(), True, 
-                            Gdk.EventMask.BUTTON_RELEASE_MASK | 
-                            Gdk.EventMask.POINTER_MOTION_MASK,
-                            None, None, event.time)
+            # Nota: pointer_grab está deprecated pero grab_add() es suficiente para captura de eventos
             
             self.logger.debug(f"Inicio arrastre - Posición: ({x}, {y}), Offset: ({self.drag_offset_x}, {self.drag_offset_y})")
             return True  # Capturar el evento para evitar conflictos
@@ -1561,7 +1547,6 @@ class FloatingButtonApp:
         if event.button == 1 and self.dragging:
             # Liberar captura de eventos
             widget.grab_remove()
-            Gdk.pointer_ungrab(event.time)
             
             # Check if it was a drag or a click
             drag_distance = ((event.x_root - self.drag_start_x) ** 2 +
@@ -1591,14 +1576,28 @@ class FloatingButtonApp:
                 x = int(event.x_root - self.drag_offset_x)
                 y = int(event.y_root - self.drag_offset_y)
 
-                # Validar coordenadas para evitar errores en máquinas virtuales
-                screen = Gdk.Screen.get_default()
-                screen_width = screen.get_width()
-                screen_height = screen.get_height()
-                
-                # Limitar coordenadas dentro de la pantalla
-                x = max(0, min(x, screen_width - self.button_size))
-                y = max(0, min(y, screen_height - self.button_size))
+                # Calcular área total de todos los monitores (soporte multi-pantalla)
+                display = Gdk.Display.get_default()
+                n_monitors = display.get_n_monitors()
+
+                # Calcular límites totales del escritorio (todos los monitores)
+                min_x = 0
+                min_y = 0
+                max_x = 0
+                max_y = 0
+
+                for i in range(n_monitors):
+                    monitor = display.get_monitor(i)
+                    geometry = monitor.get_geometry()
+                    # Expandir límites
+                    min_x = min(min_x, geometry.x)
+                    min_y = min(min_y, geometry.y)
+                    max_x = max(max_x, geometry.x + geometry.width)
+                    max_y = max(max_y, geometry.y + geometry.height)
+
+                # Limitar coordenadas dentro del área total del escritorio
+                x = max(min_x, min(x, max_x - self.button_size))
+                y = max(min_y, min(y, max_y - self.button_size))
 
                 # Mover ventana principal
                 self.window.move(x, y)
@@ -1611,7 +1610,6 @@ class FloatingButtonApp:
                 self.logger.error(f"Error en arrastre: {e}")
                 self.dragging = False
                 widget.grab_remove()
-                Gdk.pointer_ungrab(Gdk.CURRENT_TIME)
         return False
 
     def _update_favorites_during_drag(self, main_x, main_y):
@@ -1695,13 +1693,27 @@ class FloatingButtonApp:
                 x = int(event.x_root - self.drag_offset_x)
                 y = int(event.y_root - self.drag_offset_y)
 
-                # Validar coordenadas
-                screen = Gdk.Screen.get_default()
-                screen_width = screen.get_width()
-                screen_height = screen.get_height()
+                # Calcular área total de todos los monitores (soporte multi-pantalla)
+                display = Gdk.Display.get_default()
+                n_monitors = display.get_n_monitors()
 
-                x = max(0, min(x, screen_width - self.button_size))
-                y = max(0, min(y, screen_height - self.button_size))
+                # Calcular límites totales del escritorio
+                min_x = 0
+                min_y = 0
+                max_x = 0
+                max_y = 0
+
+                for i in range(n_monitors):
+                    monitor = display.get_monitor(i)
+                    geometry = monitor.get_geometry()
+                    min_x = min(min_x, geometry.x)
+                    min_y = min(min_y, geometry.y)
+                    max_x = max(max_x, geometry.x + geometry.width)
+                    max_y = max(max_y, geometry.y + geometry.height)
+
+                # Limitar coordenadas dentro del área total
+                x = max(min_x, min(x, max_x - self.button_size))
+                y = max(min_y, min(y, max_y - self.button_size))
 
                 # Mover ventana principal
                 self.window.move(x, y)

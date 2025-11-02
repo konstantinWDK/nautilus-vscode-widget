@@ -5,6 +5,40 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.3.12] - 2025-11-02
+
+### 🧹 Limpieza de Código y Soporte Multi-Pantalla
+
+#### Soporte Completo Multi-Pantalla
+- **NUEVO**: El widget ahora se puede arrastrar entre múltiples monitores/pantallas
+- **Cálculo de área total**: Detecta automáticamente todos los monitores conectados
+- **Límites inteligentes**: Respeta los límites de cada monitor (negativos o positivos)
+- **Sin restricciones**: Ya no está limitado solo al monitor primario
+- **Funcionamiento**: Calcula `min_x`, `min_y`, `max_x`, `max_y` de todos los monitores
+
+#### Eliminación Completa de Xlib
+- **REMOVED**: Todo el código relacionado con Xlib eliminado
+- **Sin warnings**: Ya no aparece "Xlib no disponible" en los logs
+- **Más ligero**: Sin dependencia innecesaria de `python3-xlib`
+- **Funcionamiento igual**: El widget detecta ventanas con gdbus, xdotool y wmctrl
+
+#### Reemplazo de Funciones GTK Deprecated
+- **FIX**: `Gdk.pointer_grab()` eliminado - ahora usa solo `grab_add()`
+- **FIX**: `Gdk.pointer_ungrab()` eliminado - usa `grab_remove()`
+- **FIX**: `screen.get_width()` reemplazado por `monitor.get_geometry().width`
+- **FIX**: `screen.get_height()` reemplazado por `monitor.get_geometry().height`
+- **Resultado**: Sin DeprecationWarnings al iniciar
+
+#### Mejoras de Inicio
+- **Inicio limpio**: Sin warnings de deprecated al arrancar
+- **Segundo plano**: Widget se ejecuta correctamente en background
+- **Primera instalación**: Funciona correctamente desde el primer inicio
+
+#### Cambios Técnicos
+- Método moderno de captura de eventos: `grab_add()` sin pointer_grab
+- Detección de dimensiones de pantalla: `Gdk.Display.get_primary_monitor()`
+- Log mejorado: Muestra herramientas disponibles (xdotool, gdbus, wmctrl)
+
 ## [3.3.11] - 2025-11-02
 
 ### 🎨 Ventanas Unificadas, Transparencia y Tema Adaptativo
