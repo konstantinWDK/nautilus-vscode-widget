@@ -7,12 +7,21 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [3.3.11] - 2025-11-02
 
-### 🎨 Tema Adaptativo y Transparencia Mejorada
+### 🎨 Ventanas Unificadas, Transparencia y Tema Adaptativo
+
+#### Ventanas Unificadas con Arrastre Completo
+- **FIX CRÍTICO**: Widget ahora aparece como un solo bloque unificado, no como 2 ventanas separadas
+- **set_transient_for()**: Ventana de favoritos vinculada a ventana principal
+- **Arrastre desde cualquier parte**: Se puede arrastrar clickando en el botón principal O en el área de favoritos
+- **Movimiento sincronizado**: Ambas ventanas se mueven juntas como una sola unidad
+- **Handlers unificados**: `on_favorites_press/release/motion` para arrastre desde favoritos
+- **keep_above**: Ambas ventanas configuradas para mantenerse encima
 
 #### Corrección de Transparencia del Widget
 - **FIX**: Eliminado cuadro negro alrededor del botón circular principal
+- **Visual RGBA**: Configurado en ambas ventanas (principal + favoritos) sin cairo
 - **CSS mejorado**: Ventana (`#floating-button`) y contenedor Fixed (`#main-container`) completamente transparentes
-- **Solo el botón tiene fondo**: El círculo del botón es lo único visible con color
+- **Solo los botones tienen fondo**: Círculos visibles con color, resto transparente
 - **Mejor integración visual**: Widget se integra perfectamente sin fondos extraños
 
 #### Mejoras en la Interfaz de Configuración

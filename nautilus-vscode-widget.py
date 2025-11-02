@@ -974,28 +974,41 @@ class FloatingButtonApp:
         # Crear ventana para el contenedor de favoritos
         self.favorites_window = Gtk.Window()
         self.favorites_window.set_decorated(False)
-        # Usar UTILITY de nuevo pero sin keep_above
+
+        # CRÍTICO: Vincular a la ventana principal para que actúen como una sola
+        self.favorites_window.set_transient_for(self.window)
+
+        # Usar UTILITY y keep_above para mantenerlo encima
         self.favorites_window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
         self.favorites_window.set_skip_taskbar_hint(True)
         self.favorites_window.set_skip_pager_hint(True)
+        self.favorites_window.set_keep_above(True)
         self.favorites_window.set_accept_focus(False)
         self.favorites_window.set_app_paintable(True)
         self.favorites_window.set_name("favorites-container")
+
         # Permitir que la ventana pase eventos de mouse a través de áreas transparentes
         self.favorites_window.set_property("can-focus", False)
-        # CRÍTICO: Hacer que la ventana NO capture eventos excepto en widgets específicos
-        self.favorites_window.set_events(Gdk.EventMask.BUTTON_PRESS_MASK |
-                                         Gdk.EventMask.BUTTON_RELEASE_MASK)
+
+        # Habilitar eventos de arrastre también en la ventana de favoritos
+        self.favorites_window.connect('button-press-event', self.on_favorites_press)
+        self.favorites_window.connect('button-release-event', self.on_favorites_release)
+        self.favorites_window.connect('motion-notify-event', self.on_favorites_motion)
+
+        self.favorites_window.add_events(Gdk.EventMask.BUTTON_PRESS_MASK |
+                                        Gdk.EventMask.BUTTON_RELEASE_MASK |
+                                        Gdk.EventMask.POINTER_MOTION_MASK)
 
         # Tamaño del contenedor - se ajustará dinámicamente
         self.favorites_window.set_default_size(60, 60)
         self.favorites_window.set_resizable(False)
 
-        # Transparencia
-        screen = Gdk.Screen.get_default()
+        # Transparencia RGBA para fondo transparente
+        screen = self.favorites_window.get_screen()
         visual = screen.get_rgba_visual()
-        if visual:
+        if visual and screen.is_composited():
             self.favorites_window.set_visual(visual)
+            self.logger.debug("Visual RGBA configurado para ventana de favoritos")
 
         # Crear layout principal para el contenedor
         self.favorites_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -1203,6 +1216,29 @@ class FloatingButtonApp:
         except Exception as e:
             self.logger.error(f"Error en _ensure_correct_zorder: {e}", exc_info=True)
         return False  # No repetir
+
+    def _update_favorites_position(self):
+        """Actualizar posición de ventana de favoritos relativa al botón principal"""
+        try:
+            # Obtener dimensiones actuales del contenedor de favoritos
+            alloc = self.favorites_box.get_allocation()
+            container_width = max(60, alloc.width + 8)
+            container_height = max(60, alloc.height + 8)
+
+            # Calcular posición relativa al botón principal
+            main_x, main_y = self.window.get_position()
+            main_center_x = main_x + self.button_size // 2
+            container_x = main_center_x - container_width // 2
+
+            # Posicionar encima del botón principal
+            num_buttons = len(self.config.get('favorite_folders', []))
+            separation = 8 if num_buttons == 0 else 6
+            container_y = main_y - container_height - separation
+
+            # Mover ventana de favoritos
+            self.favorites_window.move(container_x, container_y)
+        except Exception as e:
+            self.logger.error(f"Error actualizando posición de favoritos: {e}")
 
     # OPTIMIZACIÓN: Función eliminada - ya no se usa timer periódico
     # El z-order se corrige bajo demanda llamando a _ensure_correct_zorder()
@@ -1620,7 +1656,64 @@ class FloatingButtonApp:
         """Backup handler - normalmente no se usa"""
         return False  # Dejar que el manejador del botón lo procese
 
+    def on_favorites_press(self, widget, event):
+        """Iniciar arrastre desde la ventana de favoritos"""
+        if event.button == 1:  # Click izquierdo
+            self.dragging = True
+            self.drag_start_x = event.x_root
+            self.drag_start_y = event.y_root
 
+            # Obtener posición de la ventana PRINCIPAL, no de favoritos
+            x, y = self.window.get_position()
+            self.drag_offset_x = event.x_root - x
+            self.drag_offset_y = event.y_root - y
+
+            self.logger.debug(f"Inicio arrastre desde favoritos - Posición: ({x}, {y})")
+            return True
+        return False
+
+    def on_favorites_release(self, widget, event):
+        """Terminar arrastre desde favoritos"""
+        if event.button == 1 and self.dragging:
+            self.dragging = False
+
+            # Guardar nueva posición
+            x, y = self.window.get_position()
+            self.config['position_x'] = x
+            self.config['position_y'] = y
+            self.save_config()
+
+            self.logger.debug(f"Fin arrastre desde favoritos - Nueva posición: ({x}, {y})")
+            return True
+        return False
+
+    def on_favorites_motion(self, widget, event):
+        """Mover widget arrastrando desde favoritos"""
+        if self.dragging:
+            try:
+                # Calcular nueva posición basada en la ventana PRINCIPAL
+                x = int(event.x_root - self.drag_offset_x)
+                y = int(event.y_root - self.drag_offset_y)
+
+                # Validar coordenadas
+                screen = Gdk.Screen.get_default()
+                screen_width = screen.get_width()
+                screen_height = screen.get_height()
+
+                x = max(0, min(x, screen_width - self.button_size))
+                y = max(0, min(y, screen_height - self.button_size))
+
+                # Mover ventana principal
+                self.window.move(x, y)
+
+                # Actualizar posición de favoritos relativa
+                self._update_favorites_position()
+
+                return True
+            except Exception as e:
+                self.logger.error(f"Error en arrastre desde favoritos: {e}")
+                return False
+        return False
 
     def _adjust_check_intervals(self, nautilus_focused):
         """Función legacy - Ya no se usan timers de detección continua"""
