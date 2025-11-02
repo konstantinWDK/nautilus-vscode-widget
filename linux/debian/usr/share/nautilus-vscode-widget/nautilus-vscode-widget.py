@@ -964,11 +964,16 @@ class FloatingButtonApp:
         self.favorites_window = Gtk.Window()
         self.favorites_window.set_decorated(False)
 
-        # CRÍTICO: Vincular a la ventana principal para que actúen como una sola
-        self.favorites_window.set_transient_for(self.window)
+        # Configuración específica según el display server
+        if self.env['display_server'] == 'wayland':
+            # En Wayland: NO usar set_transient_for con UTILITY (causa errores)
+            # Usar DOCK que funciona sin parent
+            self.favorites_window.set_type_hint(Gdk.WindowTypeHint.DOCK)
+        else:
+            # En X11: Vincular a la ventana principal con UTILITY
+            self.favorites_window.set_transient_for(self.window)
+            self.favorites_window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
 
-        # Usar UTILITY y keep_above para mantenerlo encima
-        self.favorites_window.set_type_hint(Gdk.WindowTypeHint.UTILITY)
         self.favorites_window.set_skip_taskbar_hint(True)
         self.favorites_window.set_skip_pager_hint(True)
         self.favorites_window.set_keep_above(True)

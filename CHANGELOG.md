@@ -29,7 +29,10 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 - **FIX**: `screen.get_height()` reemplazado por `monitor.get_geometry().height`
 - **Resultado**: Sin DeprecationWarnings al iniciar
 
-#### Mejoras de Inicio
+#### Mejoras de Inicio y Compatibilidad Wayland
+- **FIX Wayland**: Corregido error "temporary window without parent" en Wayland
+- **Configuración adaptativa**: Ventana de favoritos usa DOCK en Wayland, UTILITY en X11
+- **Sin set_transient_for en Wayland**: Evita errores de "impl->transient_for failed"
 - **Inicio limpio**: Sin warnings de deprecated al arrancar
 - **Segundo plano**: Widget se ejecuta correctamente en background
 - **Primera instalación**: Funciona correctamente desde el primer inicio
