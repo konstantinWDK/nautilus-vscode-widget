@@ -25,6 +25,11 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 - **Mejor integración visual**: Widget se integra perfectamente sin fondos extraños
 
 #### Mejoras en la Interfaz de Configuración
+- **NUEVO**: Botón "📍 Reposicionar al Centro" para desbloquear widget
+  - Mueve el widget al centro de la pantalla
+  - Reinicia variables de arrastre
+  - Refresca z-order de ventanas
+  - Útil si el widget se queda bloqueado o fuera de pantalla
 - **FIX**: Ventana de configuración ahora se adapta al tema del sistema (claro/oscuro)
 - **Detección automática de tema**: Lee `gtk-theme-name` y `gtk-application-prefer-dark-theme`
 - **CSS adaptativo**:

@@ -2488,13 +2488,44 @@ class SettingsDialog:
         autostart_info.set_margin_start(20)
         box.pack_start(autostart_info, False, False, 0)
 
+        # Separator
+        separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        separator.set_margin_top(15)
+        separator.set_margin_bottom(10)
+        box.pack_start(separator, False, False, 0)
+
+        # Reposition button section
+        reposition_label = Gtk.Label()
+        reposition_label.set_markup('<span font="10" weight="bold">🎯 Posición del Widget</span>')
+        reposition_label.set_xalign(0)
+        box.pack_start(reposition_label, False, False, 0)
+
+        reposition_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        reposition_box.set_margin_top(5)
+        reposition_box.set_margin_bottom(5)
+
+        reposition_button = Gtk.Button(label="�� Reposicionar al Centro")
+        reposition_button.set_tooltip_text("Mueve el widget al centro de la pantalla y reinicia la funcionalidad de arrastre")
+        reposition_button.connect('clicked', self.on_reposition_widget)
+        reposition_box.pack_start(reposition_button, True, True, 0)
+
+        box.pack_start(reposition_box, False, False, 0)
+
+        reposition_info = Gtk.Label()
+        reposition_info.set_markup('<span font="8" style="italic">💡 Usa este botón si el widget se queda bloqueado o fuera de la pantalla</span>')
+        reposition_info.set_xalign(0)
+        reposition_info.set_margin_start(20)
+        reposition_info.set_line_wrap(True)
+        reposition_info.set_max_width_chars(45)
+        box.pack_start(reposition_info, False, False, 0)
+
         # Info
         info = Gtk.Label()
         info.set_markup(
             '<span font="9" style="italic">💡 Puedes arrastrar el botón flotante\n'
             'para moverlo a cualquier posición</span>'
         )
-        info.set_margin_top(20)
+        info.set_margin_top(15)
         box.pack_start(info, False, False, 0)
 
         # Current directory info
@@ -2780,6 +2811,52 @@ StartupNotify=false
             self.editor_entry.set_text(selected_file)
 
         dialog.destroy()
+
+    def on_reposition_widget(self, button):
+        """Reposicionar widget al centro de la pantalla"""
+        try:
+            # Obtener dimensiones de la pantalla
+            display = Gdk.Display.get_default()
+            monitor = display.get_primary_monitor() or display.get_monitor(0)
+            geometry = monitor.get_geometry()
+            screen_width = geometry.width
+            screen_height = geometry.height
+
+            # Calcular posición central
+            new_x = screen_width // 2 - self.app.button_size // 2
+            new_y = screen_height // 2 - self.app.button_size // 2
+
+            # Actualizar configuración
+            self.app.config['position_x'] = new_x
+            self.app.config['position_y'] = new_y
+            self.app.save_config()
+
+            # Mover ventana principal
+            self.app.window.move(new_x, new_y)
+
+            # Actualizar posición de favoritos
+            GLib.idle_add(self.app._update_favorites_position)
+
+            # Reiniciar variables de arrastre para refrescar
+            self.app.dragging = False
+            self.app.drag_start_x = 0
+            self.app.drag_start_y = 0
+            self.app.drag_offset_x = 0
+            self.app.drag_offset_y = 0
+
+            # Asegurar z-order correcto
+            GLib.idle_add(self.app._ensure_correct_zorder)
+
+            self.app.logger.info(f"Widget reposicionado al centro: ({new_x}, {new_y})")
+
+            # Mostrar confirmación visual
+            button.set_label("✅ Reposicionado")
+            GLib.timeout_add(2000, lambda: button.set_label("📍 Reposicionar al Centro"))
+
+        except Exception as e:
+            self.app.logger.error(f"Error reposicionando widget: {e}", exc_info=True)
+            button.set_label("❌ Error")
+            GLib.timeout_add(2000, lambda: button.set_label("📍 Reposicionar al Centro"))
 
     def show_restart_dialog(self):
         """Show restart confirmation"""
